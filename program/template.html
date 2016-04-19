@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+  <title>EggOops</title>
+  <link rel="stylesheet" href="http://code.jquery.com/mobile/1.3.2/jquery.mobile-1.3.2.min.css" />
+  <script src="http://code.jquery.com/jquery-1.9.1.min.js"></script>
+  <script>
+    $(document).bind('mobileinit',function(){
+        $.mobile.changePage.defaults.changeHash = false;
+        $.mobile.hashListeningEnabled = false;
+        $.mobile.pushStateEnabled = false;
+    });
+</script> 
+  <script src="http://code.jquery.com/mobile/1.3.2/jquery.mobile-1.3.2.min.js"></script>
+  <!-- Latest compiled and minified CSS -->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css" integrity="sha384-1q8mTJOASx8j1Au+a5WDVnPi2lkFfwwEAa8hDDdjZlpLegxhjVME1fgjWPGmkzs7" crossorigin="anonymous">
+
+    <!-- Latest compiled and minified JavaScript -->
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js" integrity="sha384-0mSbJDEHialfmuBBQP6A4Qrprq5OVfW37PRR3j5ELqxss1yVqOtnepnHVP9aJ7xS" crossorigin="anonymous"></script>
+    <!-- Fonts -->
+    <link href="https://maxcdn.bootstrapcdn.com/font-awesome/4.2.0/css/font-awesome.min.css" rel="stylesheet">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta content="width=device-width,minimum-scale=1.0,maximum-scale=1.0,user-scalable=no" name="viewport"/>
+
+    <link rel="stylesheet" href="main.css">
+
+    <script type="text/javascript" src="./button.js"> </script>
+    <script type="text/javascript" src="../libs/three.js"></script>
+    <script type="text/javascript" src="../libs/jquery-1.9.0.js"></script>
+    <script type="text/javascript" src="../libs/stats.js"></script>
+    <script type="text/javascript" src="../libs/dat.gui.js"></script>
+    <script type="text/javascript" src="./map.js"></script>
+    <script type="text/javascript" src="./ball.js"></script>
+    <script type="text/javascript" src="./helpers.js"></script>
+    <script type="text/javascript" src="./ViewClasses.js"></script>
+
+    <style>
+        body{
+            /* set margin to 0 and overflow to hidden, to go fullscreen */
+            margin: 0;
+            overflow: hidden;
+        }
+    </style>
+</head>
+    <body>
+
+    <div id="Stats-output">
+    </div>
+    <!-- Div which will hold the Output -->
+    <div id="WebGL-output">
+    </div>
+    <!-- Javascript code that runs our Three.js examples -->
+    <script type="text/javascript">
+
+        var reset_bit = false;
+
+        // once everything is loaded, we run our Three.js stuff.
+        $(function () {
+
+            var display_ratio = 0.75;
+            //------------------------------------------------------------------------------
+            // setup system
+            function initStats() {
+
+                // initial settings
+                var stats = new Stats();
+                stats.setMode(0); // 0: fps, 1: ms
+
+                // Align top-left
+                stats.domElement.style.position = 'absolute';
+                stats.domElement.style.left = '0px';
+                stats.domElement.style.top = '0px';
+
+                $("#Stats-output").append(stats.domElement);
+
+                return stats;
+            }
+            var stats = initStats();
+
+            // create a scene, that will hold all our elements such as objects, cameras and lights.
+            var scene = new THREE.Scene();
+
+            // create a camera, which defines where we're looking at.
+            function get_fov() {
+                var fov = 300 * Math.atan(window.innerHeight * display_ratio / window.innerWidth) / Math.PI;
+                if (fov < 45) {
+                    return 45;
+                } else {
+                    return fov;
+                }
+            }
+            function get_aspect() {
+                return window.innerWidth / window.innerHeight / display_ratio;
+            }
+            var camera = new THREE.PerspectiveCamera(get_fov(), get_aspect(), 0.1, 1000);
+            console.log('current fov: ' + get_fov().toString());
+            
+            // create a render and set the size
+            var renderer = new THREE.WebGLRenderer();
+            renderer.setClearColor(new THREE.Color(0xEEEEEE, 1.0));
+            renderer.setSize(window.innerWidth, window.innerHeight * display_ratio);
+            renderer.shadowMapEnabled = true;
+
+            //------------------------------------------------------------------------------
+            // create the ground plane
+            var planeGeometry = new THREE.PlaneGeometry(60,20,1,1);
+            var planeMaterial = new THREE.MeshLambertMaterial({ color: 0x4169E1 });
+            var plane = new THREE.Mesh(planeGeometry,planeMaterial);
+            plane.receiveShadow  = true;
+
+            // rotate and position the plane
+            plane.rotation.x = -0.5 * Math.PI;
+            plane.position.x = 0;
+            plane.position.y = -18;
+            plane.position.z = 0;
+
+            // add the plane to the scene
+            scene.add(plane);
+
+            init_helpers();
+            //------------------------------------------------------------------------------
+            // create MapUnits
+            var cube = [];
+            var cube_counter = 0;
+            for (var i = 0; i < 6; ++i) {
+                cube[cube_counter] = new Cube_view(0.5, 5.5, 4, -27.5, -12 + 6 * i);
+                cube[cube_counter].init();
+                cube[cube_counter].display(scene);
+                ++cube_counter;
+            }
+
+            for (var i = 0; i < 6; ++i) {
+                for (var j = 0; j < 6; ++j) {
+                    // bottom
+                    switch (ball.map.content[i][j].bottom) {
+                        case "tilt_left":
+                            var dot = screen2world({ 'x': (2 * i + 1) / 12, 'y': (2 * j) / 12 });
+                            cube[cube_counter] = new Cube_view(5, 0.5, 4, dot.x, dot.y);
+                            cube[cube_counter].init();
+                            //cube[cube_counter].display(scene);
+                            //cube[cube_counter].obj.rotation.z += 10;
+                            ++cube_counter;
+                            break;
+                        case "tilt_right":
+                            var dot = screen2world({ 'x': (2 * i + 1) / 12, 'y': (2 * j) / 12 });
+                            cube[cube_counter] = new Cube_view(5, 0.5, 4, dot.x, dot.y);
+                            cube[cube_counter].init();
+                            //cube[cube_counter].display(scene);
+                            //cube[cube_counter].obj.rotation.z -= 10;
+                            ++cube_counter;
+                            break;
+                        default:
+                            var dot = screen2world({ 'x': (2 * i + 1) / 12, 'y': (2 * j) / 12 });
+                            cube[cube_counter] = new Cube_view(5, 0.5, 4, dot.x, dot.y);
+                            cube[cube_counter].init();
+                            //cube[cube_counter].display(scene);
+                            ++cube_counter;
+                    }
+                    
+                    
+                    // right
+                    var dot = screen2world({ 'x': (2 * i + 2) / 12, 'y': (2 * j + 1) / 12 });
+                    cube[cube_counter] = new Cube_view(0.5, 5.5, 4, dot.x, dot.y);
+                    cube[cube_counter].init();
+                    //cube[cube_counter].display(scene);
+                    ++cube_counter;
+
+                    // center
+                    var dot = screen2world({ 'x': (2 * i + 1) / 12, 'y': (2 * j + 1) / 12 });
+                    cube[cube_counter] = new Cube_view(2, 2, 2, dot.x, dot.y);
+                    cube[cube_counter].init();
+                    //cube[cube_counter].display(scene);
+                    ++cube_counter;
+                }
+            }
+            
+            //------------------------------------------------------------------------------
+            // creat a sphere
+            var moveball = new Ball_view(1, 0, 0);
+            moveball.init(scene);
+
+            var dot = screen2world({ x: (2 * ball.map.exitx + 1) / 12, y: (2 * ball.map.exity + 1) / 12 });
+            var exitBall1 = new Ball_view(0.5, dot.x, dot.y);
+            exitBall1.init(scene);
+            exitBall1.obj.material.color.setHex(0xFFFF00);
+
+            var exitBall2 = new Ball_view(0.5, dot.x, dot.y);
+            exitBall2.init(scene);
+            exitBall2.obj.material.color.setHex(0xFFFF00);
+
+            //------------------------------------------------------------------------------
+            // setup window resizing
+            function onWindowResize() {
+                // update camera
+                camera.fov = get_fov();
+                camera.aspect = get_aspect();
+                camera.updateProjectionMatrix();
+                console.log('current fov: '+get_fov().toString());
+                // call resize
+                renderer.setSize(window.innerWidth, window.innerHeight * display_ratio);
+            }
+            window.addEventListener('resize', onWindowResize, false);
+
+            // position and point the camera to the center of the scene
+            camera.position.x = 0;
+            camera.position.y = 0;
+            camera.position.z = 60;
+            camera.lookAt({'x':0,'y':0,'z':0});
+
+            // add subtle ambient lighting
+            var ambientLight = new THREE.AmbientLight(0x0c0c0c);
+            scene.add(ambientLight);
+
+            // add spotlight for the shadows
+            var dirLight = new THREE.DirectionalLight(0xffffff, 0.9);
+            dirLight.position.set(0, 10, 50);
+            dirLight.castShadow = true;
+            scene.add(dirLight);
+
+            var spotLight1 = new THREE.SpotLight(0xffffff,0.3);
+            spotLight1.position.set(0, 60, 10);
+            spotLight1.castShadow = true;
+            scene.add(spotLight1);
+
+            //var spotLight2 = new THREE.SpotLight(0xffffff);
+            //spotLight2.position.set(-20, 10, 50);
+            //spotLight2.castShadow = true;
+            //scene.add(spotLight2);
+
+            // add the output of the renderer to the html element
+            $("#WebGL-output").append(renderer.domElement);
+
+            // GUI controls
+            var gui = new dat.GUI();
+
+            var controls = {
+                rotateSpeed: 0.05,
+                moveSpeed: 0.1
+            };
+            //gui.add(controls, 'rotateSpeed', 0, 0.5);
+            //gui.add(controls, 'moveSpeed', 0, 0.5);
+
+            //------------------------------------------------------------------------------
+            // call the render function
+
+            function render() {
+
+                exitBall1.circular(0.1, 1.2);
+                exitBall2.circular(-0.2, 1.5);
+
+                for (var i = 0; i < 6; ++i) {
+                    for (var j = 0; j < 6; ++j) {
+                        // bottom
+                        if (ball.map.content[i][j].bottom != 'empty') {
+                            cube[6 + 3 * (6 * i + j) + 0].display(scene);
+                            cube[6 + 3 * (6 * i + j) + 0].obj.material.color.setStyle(content2Color(ball.map.content[i][j].bottom));
+                            if (ball.map.content[i][j].bottom == 'tilt_left') {
+                                cube[6 + 3 * (6 * i + j) + 0].obj.rotation.z = 10;
+                            } else if (ball.map.content[i][j].bottom == 'tilt_right') {
+                                cube[6 + 3 * (6 * i + j) + 0].obj.rotation.z = -10;
+                            } else {
+                                cube[6 + 3 * (6 * i + j) + 0].obj.rotation.z = 0;
+                            }
+                        } else {
+                            cube[6 + 3 * (6 * i + j) + 0].remove(scene);
+                        }
+                        // right
+                        if (i == 5) {
+                            cube[6 + 3 * (6 * i + j) + 1].display(scene);
+                        } else if (ball.map.content[i][j].right != 'empty') {
+                            cube[6 + 3 * (6 * i + j) + 1].display(scene);
+                            cube[6 + 3 * (6 * i + j) + 1].obj.material.color.setStyle(content2Color(ball.map.content[i][j].right));
+                        } else {
+                            cube[6 + 3 * (6 * i + j) + 1].remove(scene);
+                        }
+                        // center
+                        if (ball.map.content[i][j].center != 'empty') {
+                            cube[6 + 3 * (6 * i + j) + 2].display(scene);
+                            cube[6 + 3 * (6 * i + j) + 2].rotate(controls.rotateSpeed);
+                            cube[6 + 3 * (6 * i + j) + 2].obj.material.color.setStyle(content2Color(ball.map.content[i][j].center));
+                        } else {
+                            cube[6 + 3 * (6 * i + j) + 2].remove(scene);
+                        }
+                    }
+                }
+
+                function update_Exit() {
+                    var dot = screen2world({ x: (2 * ball.map.exitx + 1) / 12, y: (2 * ball.map.exity + 1) / 12 });
+
+                    exitBall1.x0 = dot.x;
+                    exitBall1.y0 = dot.y;
+
+                    exitBall2.x0 = dot.x;
+                    exitBall2.y0 = dot.y;
+
+                }
+
+                if (reset_bit) { update_Exit(); }
+
+                // update status
+                stats.update();
+
+                // bounce the sphere up and down
+                moveball.move(controls.moveSpeed);
+
+                // render using requestAnimationFrame
+                requestAnimationFrame(render);
+                renderer.render(scene, camera);
+
+            }
+
+            // call function
+            render();
+
+        });
+
+    </script>
+
+    <br />
+        <div class = "container">
+            <div class = "row">
+                <div class = "col-xs-6">
+                  <!-- Standard button -->
+                  <button type="button" class="btn btn-default btn-control" id="btn-left"><i class="fa fa-angle-left" aria-hidden="true"></i></button> 
+                  <button type="button" class="btn btn-default btn-control" id="btn-right"><i class="fa fa-angle-right" aria-hidden="true"></i></button> 
+                </div>
+                <div class = "col-xs-3">
+                  <button type="button" class="btn btn-danger btn-control" id="btn-cross"><i class="fa fa-times" aria-hidden="true"></i></button> 
+                </div>
+                <div class = "col-xs-3">
+                  <!-- Standard button -->
+                  <button type="button" class="btn btn-default btn-control pull-right" id="btn-up"><i class="fa fa-angle-up" aria-hidden="true"></i></button> 
+
+                </div>
+            </div>
+        </div>
+    </body>
+</html>
